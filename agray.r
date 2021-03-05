@@ -8,10 +8,10 @@ library(tidyverse)
 agray <- function(file, alias) {
   require(tidyverse)
   
-  message("Loading file '", file, "' with alias '", alias, "'...", "\n")
+  dir.create("out", showWarnings = F)
   
   # read raw csv
-  df <- suppressMessages(read_csv(file))
+  df <- suppressMessages(suppressWarnings(read_csv(file)))
   
   # clean up raw csv and remove culls
   df_clean <- df %>%
@@ -27,16 +27,19 @@ agray <- function(file, alias) {
         Size >= 1.5 ~ "B",
         T ~ "C"))
   
+  message("Loaded file '", file, "' with alias '", alias, "'")
+  
   # get ordered plot list
   plots <- unique(df_clean$Plot)
   message("\nPlots:")
   print(plots)
   
-  if (is.character(df_clean$Plot)) {message("Warning: Non-numeric plot number detected.")}  
+  if (is.character(df_clean$Plot)) message("Warning: Non-numeric plot number(s) detected.") 
   
   # save tuber list
-  df_clean %>% write_csv(paste0(alias, "_tubers.csv"))
-  message("\nSaved graded tuber list to '", paste0(alias, "_tubers.csv"), "'")
+  outfile <- paste0("out/", alias, "_tubers.csv")
+  df_clean %>% write_csv(outfile)
+  message("\nSaved graded tuber list to '", outfile, "'")
   
   # get culls
   culls <- df %>%
@@ -45,10 +48,12 @@ agray <- function(file, alias) {
     rename(cull_wt = Trial) %>%
     cbind(tibble(Plot = plots), .)
   
-  culls %>% write_csv(paste0(alias, "_culls.csv"))
-  message("\nSaved culls list to '", paste0(alias, "_culls.csv"), "'")
+  # write culls list
+  outfile <- paste0("out/", alias, "_culls.csv")
+  culls %>% write_csv(outfile)
+  message("\nSaved culls list to '", outfile, "'")
   
-  # total summary
+  # generate total summaries
   summary1 <- df_clean %>%
     group_by(Plot) %>%
     summarise(
@@ -62,7 +67,7 @@ agray <- function(file, alias) {
     mutate(prp_defect = prp_hollow + prp_double + prp_knob) %>%
     mutate(across(c(prp_hollow, prp_double, prp_knob, prp_defect), ~ .x / n_tubers))
   
-  # summary by grade
+  # generate summaries by grade
   summary2 <- df_clean %>%
     group_by(Plot, Grade) %>%
     summarise(
@@ -85,8 +90,10 @@ agray <- function(file, alias) {
     left_join(summary2, by = "Plot") %>%
     left_join(culls, by = "Plot")
   
-  summary %>% write_csv(paste0(alias, "_summary.csv"))
-  message("\nGrading summary saved to '", paste0(alias, "_summary.csv"), "'")
+  # write summary file
+  outfile <- paste0("out/", alias, "_summary.csv")
+  summary %>% write_csv(outfile)
+  message("\nGrading summary saved to '", outfile, "'")
 }
 
 
