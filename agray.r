@@ -5,28 +5,27 @@
 
 library(tidyverse)
 
-
 agray <- function(file, alias) {
+  require(tidyverse)
   
   message("Loading file '", file, "' with alias '", alias, "'...", "\n")
-  
   
   # read raw csv
   df <- suppressMessages(read_csv(file))
   
-  
   # clean up raw csv and remove culls
   df_clean <- df %>%
-    filter(!is.na(Researcher),
+    filter(
+      !is.na(Researcher),
       Researcher != "Researcher",
       Researcher != "Culls Weight") %>%
     type_convert() %>%
     mutate(Size = pmap_dbl(list(Width, Length, Height), ~ sort(c(..1, ..2, ..3))[2])) %>%
-    mutate(Grade = case_when(
-      Size >= 1.875 ~ "A",
-      Size >= 1.5 ~ "B",
-      T ~ "C"))
-  
+    mutate(
+      Grade = case_when(
+        Size >= 1.875 ~ "A",
+        Size >= 1.5 ~ "B",
+        T ~ "C"))
   
   # get ordered plot list
   plots <- unique(df_clean$Plot)
@@ -35,11 +34,9 @@ agray <- function(file, alias) {
   
   if (is.character(df_clean$Plot)) {message("Warning: Non-numeric plot number detected.")}  
   
-  
   # save tuber list
   df_clean %>% write_csv(paste0(alias, "_tubers.csv"))
   message("\nSaved graded tuber list to '", paste0(alias, "_tubers.csv"), "'")
-  
   
   # get culls
   culls <- df %>%
@@ -50,7 +47,6 @@ agray <- function(file, alias) {
   
   culls %>% write_csv(paste0(alias, "_culls.csv"))
   message("\nSaved culls list to '", paste0(alias, "_culls.csv"), "'")
-  
   
   # total summary
   summary1 <- df_clean %>%
@@ -94,7 +90,8 @@ agray <- function(file, alias) {
 }
 
 
-# example data
+# Run example data
+# arguments are [file], [output file name prefix]
 agray("example-data.csv", "example")
 
 
