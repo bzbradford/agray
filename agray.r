@@ -96,7 +96,7 @@ agray <- function(file, alias) {
   message("\nGrading summary saved to '", outfile, "'")
   
   # simple plot
-  summary %>%
+  plot <- summary %>%
     ggplot(aes(x = as.character(Plot), y = total_wt)) +
     geom_col() +
     labs(
@@ -104,9 +104,10 @@ agray <- function(file, alias) {
       x = "Plot",
       y = "Total weight (oz)"
     )
+  show(plot)
   
   outfile <- paste0("out/", alias, "_plot.png")
-  ggsave(outfile)
+  ggsave(outfile, plot)
 }
 
 
