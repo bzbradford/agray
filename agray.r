@@ -6,40 +6,39 @@
 library(tidyverse)
 
 agray <- function(file, alias) {
+  
   require(tidyverse)
   
-  dir.create("out", showWarnings = F)
+  message("Loading file '", file, "' with alias '", alias, "'...", "\n")
+  
+  dir.create(alias, showWarnings = F)
   
   # read raw csv
-  df <- suppressMessages(suppressWarnings(read_csv(file)))
+  df <- suppressMessages(read_csv(file))
   
   # clean up raw csv and remove culls
   df_clean <- df %>%
-    filter(
-      !is.na(Researcher),
+    filter(!is.na(Researcher),
       Researcher != "Researcher",
       Researcher != "Culls Weight") %>%
     type_convert() %>%
     mutate(Size = pmap_dbl(list(Width, Length, Height), ~ sort(c(..1, ..2, ..3))[2])) %>%
-    mutate(
-      Grade = case_when(
-        Size >= 1.875 ~ "A",
-        Size >= 1.5 ~ "B",
-        T ~ "C"))
-  
-  message("Loaded file '", file, "' with alias '", alias, "'")
+    mutate(Grade = case_when(
+      Size >= 1.875 ~ "A",
+      Size >= 1.5 ~ "B",
+      T ~ "C"))
   
   # get ordered plot list
   plots <- unique(df_clean$Plot)
   message("\nPlots:")
   print(plots)
   
-  if (is.character(df_clean$Plot)) message("Warning: Non-numeric plot number(s) detected.") 
+  if (is.character(df_clean$Plot)) { message("Warning: Non-numeric plot number detected.") }  
   
   # save tuber list
-  outfile <- paste0("out/", alias, "_tubers.csv")
-  df_clean %>% write_csv(outfile)
-  message("\nSaved graded tuber list to '", outfile, "'")
+  tuber_path <- file.path(alias, paste(alias, "tubers.csv"))
+  df_clean %>% write_csv(tuber_path)
+  message("\nSaved graded tuber list to '", tuber_path, "'")
   
   # get culls
   culls <- df %>%
@@ -48,12 +47,11 @@ agray <- function(file, alias) {
     rename(cull_wt = Trial) %>%
     cbind(tibble(Plot = plots), .)
   
-  # write culls list
-  outfile <- paste0("out/", alias, "_culls.csv")
-  culls %>% write_csv(outfile)
-  message("\nSaved culls list to '", outfile, "'")
+  culls_path <- file.path(alias, paste(alias, "culls.csv"))
+  culls %>% write_csv(culls_path)
+  message("\nSaved culls list to '", culls_path, "'")
   
-  # generate total summaries
+  # total summary
   summary1 <- df_clean %>%
     group_by(Plot) %>%
     summarise(
@@ -67,7 +65,7 @@ agray <- function(file, alias) {
     mutate(prp_defect = prp_hollow + prp_double + prp_knob) %>%
     mutate(across(c(prp_hollow, prp_double, prp_knob, prp_defect), ~ .x / n_tubers))
   
-  # generate summaries by grade
+  # summary by grade
   summary2 <- df_clean %>%
     group_by(Plot, Grade) %>%
     summarise(
@@ -90,29 +88,45 @@ agray <- function(file, alias) {
     left_join(summary2, by = "Plot") %>%
     left_join(culls, by = "Plot")
   
-  # write summary file
-  outfile <- paste0("out/", alias, "_summary.csv")
-  summary %>% write_csv(outfile)
-  message("\nGrading summary saved to '", outfile, "'")
+  col_names_sorted <- sort(names(summary)[-1])
+  
+  summary <- summary %>%
+    select("Plot", all_of(col_names_sorted)) %>%
+    select(
+      "Plot",
+      starts_with("total_"),
+      starts_with("cull_"),
+      starts_with("mean_"),
+      starts_with("n_"),
+      starts_with("prp_"),
+      everything())
+  
+  summary_path <- file.path(alias, paste(alias, "grading summary.csv"))
+  summary %>% write_csv(summary_path)
+  message("\nGrading summary saved to '", summary_path, "'")
+  
   
   # simple plot
   plot <- summary %>%
     ggplot(aes(x = as.character(Plot), y = total_wt)) +
-    geom_col() +
+    geom_col(aes(fill = total_wt)) +
+    scale_y_continuous(expand = expansion(c(0, 0.1))) +
     labs(
       title = "Total plot weights",
       x = "Plot",
-      y = "Total weight (oz)"
-    )
+      y = "Total weight (oz)",
+    ) +
+    theme_classic() +
+    theme(
+      legend.position = "none",
+      axis.text.x = element_text(angle = -90, hjust = 0, vjust = 0.5))
   show(plot)
   
-  outfile <- paste0("out/", alias, "_plot.png")
-  ggsave(outfile, plot)
+  plot_path <- file.path(alias, paste(alias, "total weights plot.png"))
+  ggsave(plot_path, plot, type = "cairo")
 }
 
 
 # Run example data
 # arguments are [file], [output file name prefix]
 agray("example-data.csv", "example")
-
-
