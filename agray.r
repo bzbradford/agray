@@ -2,19 +2,37 @@
 # Ben Bradford, bbradford@wisc.edu
 #
 # If it doesn't run, check for missing plot numbers or too many cull weights
+# Grades can be provided as a named list in descending order of size
 
 library(tidyverse)
 
-agray <- function(file) {
+grade <- function(file, name = tools::file_path_sans_ext(basename(file)), grades = list("A" = 1.875, "B" = 1.5, "C" = 0)) {
   require(tidyverse)
   
-  alias <- tools::file_path_sans_ext(basename(file))
-  out_dir <- file.path(dirname(file), alias)
+  # Checks
+  if (!file.exists(file)) stop("File '", file, "' not found.")
+  message("Input file: ", file)
+  
+  if (is.null(name)) stop("Trial name is required.")
+  name <- as.character(name)
+  if (length(name) == 0) stop("You must provide a name for this trial.")
+  out_dir <- file.path(dirname(file), name)
+  message("Saving outputs to: ", out_dir)
+  
+  if (!is.list(grades) | is.null(names(grades))) stop("Tuber grades must be a named list.")
+  grading_criteria <- paste0(paste(names(grades), grades, sep = " >= ", collapse = '", '), '" diameter')
+  message("Grades: ", grading_criteria)
+  
+  assignGrade <- function(size) {
+    for (grade in names(grades)) {
+      if (size >= grades[grade]) return(grade)
+    }
+    "No grade"
+  }
   
   # read csv
-  message("Loading grader file '", file, "' and saving outputs to '", out_dir, "'")
   dir.create(out_dir, showWarnings = F)
-  df <- suppressWarnings(read_csv(file, col_types = cols(.default = "c")))
+  df <- suppressWarnings(read_csv(file, col_types = cols(.default = "c"), progress = F))
   
   # clean up raw csv and remove culls
   message("\nCleaning input file...")
@@ -26,13 +44,10 @@ agray <- function(file) {
     type_convert(col_types = cols()) %>%
     mutate(
       Size = pmap_dbl(list(Width, Length, Height), ~ sort(c(..1, ..2, ..3))[2]),
-      Grade = case_when(
-        Size >= 1.875 ~ "A",
-        Size >= 1.5 ~ "B",
-        T ~ "C"))
+      Grade = mapply(assignGrade, Size))
   
   # save tuber list
-  tuber_path <- file.path(out_dir, paste(alias, "- graded tuber list.csv"))
+  tuber_path <- file.path(out_dir, paste(name, "- graded tuber list.csv"))
   df_clean %>% write_csv(tuber_path)
   cat("Saving graded tuber list to:", tuber_path, "\n")
   
@@ -63,14 +78,14 @@ agray <- function(file) {
     warning("Failed to parse cull weights, check for extra cull weights or unnamed plots in data!")
   } else {
     culls <- cbind(tibble(Plot = plots), culls)
-    culls_file <- file.path(out_dir, paste(alias, "- cull weights.csv"))
+    culls_file <- file.path(out_dir, paste(name, "- cull weights.csv"))
     cat("Saving cull weights to:", culls_file, "\n")
     write_csv(culls, culls_file)
   }
   
   # total summary
   message("\nSummarizing dataset...")
-  summary1 <- df_clean %>%
+  totals_summary <- df_clean %>%
     group_by(Plot) %>%
     summarise(
       n_tubers = n(),
@@ -84,7 +99,7 @@ agray <- function(file) {
     mutate(across(c(prp_hollow, prp_double, prp_knob, prp_defect), ~ .x / n_tubers))
   
   # summary by grade
-  summary2 <- df_clean %>%
+  grade_summary <- df_clean %>%
     group_by(Plot, Grade) %>%
     summarise(
       n_tubers = n(),
@@ -95,15 +110,17 @@ agray <- function(file) {
       prp_knob = sum(Knob),
       .groups = "drop") %>%
     mutate(prp_defect = prp_hollow + prp_double + prp_knob) %>%
-    mutate(across(c(prp_hollow, prp_double, prp_knob, prp_defect), ~ .x / n_tubers)) %>%
+    mutate(across(c(prp_hollow, prp_double, prp_knob, prp_defect), ~ .x / n_tubers))
+
+  grade_summary_wide <- grade_summary %>%
     pivot_wider(
       names_from = "Grade",
       values_from = c("n_tubers", "total_wt", "mean_wt", "prp_hollow", "prp_double", "prp_knob", "prp_defect")
     )
   
   # join the summaries and the culls
-  summary <- summary1 %>%
-    left_join(summary2, by = "Plot") %>%
+  summary <- totals_summary %>%
+    left_join(grade_summary_wide, by = "Plot") %>%
     left_join(culls, by = "Plot")
   
   col_names_sorted <- sort(names(summary)[-1])
@@ -119,7 +136,7 @@ agray <- function(file) {
       starts_with("prp_"),
       everything())
   
-  summary_path <- file.path(out_dir, paste(alias, "- plot summaries.csv"))
+  summary_path <- file.path(out_dir, paste(name, "- plot summaries.csv"))
   summary %>% write_csv(summary_path)
   cat("Saving plot-wise grading summaries to:", summary_path, "\n")
   
@@ -132,24 +149,32 @@ agray <- function(file) {
       mutate(Plot = fct_inorder(as.character(Plot)))
   }
   
-  plot <- summary %>%
-    ggplot(aes(x = Plot, y = total_wt)) +
-    geom_col(aes(fill = total_wt), color = "black", size = 0.25) +
+  plot <- grade_summary %>%
+    group_by(Plot) %>%
+    mutate(pct_wt = total_wt / sum(total_wt)) %>%
+    ggplot(aes(x = Plot, y = total_wt, fill = Grade, label = scales::percent(pct_wt, 1))) +
+    geom_col(color = "black", size = 0.25, position = "stack") +
+    geom_text(position = position_stack(vjust = 0.5)) +
     scale_y_continuous(expand = expansion(c(0, 0.1))) +
     labs(
-      title = paste(alias, "- Total plot weights"),
+      title = paste(name, "- Total plot weights"),
+      subtitle = paste("Grading criteria:", grading_criteria),
       x = "Plot",
       y = "Total weight (oz)",
     ) +
     theme_classic() +
     theme(
-      legend.position = "none",
-      axis.text.x = element_text(angle = -90, hjust = 0, vjust = 0.5))
+      axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
   show(plot)
   
-  plot_path <- file.path(out_dir, paste(alias, "- total weights plot.png"))
+  plot_path <- file.path(out_dir, paste(name, "- total weights plot.png"))
   cat("Saving plot image to:", plot_path, "\n")
   suppressMessages(ggsave(plot_path, plot, type = "cairo"))
   
-  message("\nDone!")
+  assign("all_tubers", df_clean, envir = .GlobalEnv)
+  assign("grade_summary", grade_summary, envir = .GlobalEnv)
+  assign("totals_summary", summary, envir = .GlobalEnv)
+  assign("plot", plot, envir = .GlobalEnv)
+  
+  message("\nAlso data and plots to: all_tubers, grade_summary, totals_summary, plot.")
 }
