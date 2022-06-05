@@ -6,10 +6,15 @@
 
 library(tidyverse)
 
-grade <- function(file, name = tools::file_path_sans_ext(basename(file)), grades = list("A" = 1.875, "B" = 1.5, "C" = 0)) {
+grade <- function(
+  file,
+  name = tools::file_path_sans_ext(basename(file)),
+  grades = list("A" = 1.875, "B" = 1.5, "C" = 0)) {
+  
   if (!require(tidyverse)) install.packages("tidyverse")
   
-  # Checks
+# Argument checks ---------------------------------------------------------
+  
   if (!file.exists(file)) stop("File '", file, "' not found.")
   message("Input file: ", file)
   
@@ -23,6 +28,10 @@ grade <- function(file, name = tools::file_path_sans_ext(basename(file)), grades
   grading_criteria <- paste0(paste(names(grades), grades, sep = " >= ", collapse = '", '), '" diameter')
   message("Grades: ", grading_criteria)
   
+  
+
+# Define functions --------------------------------------------------------
+  
   assignGrade <- function(size) {
     for (grade in names(grades)) {
       if (size >= grades[grade]) return(grade)
@@ -30,6 +39,14 @@ grade <- function(file, name = tools::file_path_sans_ext(basename(file)), grades
     "No grade"
   }
   
+  writeCsvWithHeader <- function(df, file, header) {
+    write_csv(tibble(lines = c(header, "")), file, col_names = F)
+    write_csv(df, file, col_names = T, append = T)
+  }
+  
+
+# Read and grade data -----------------------------------------------------
+
   # read csv
   dir.create(out_dir, showWarnings = F)
   df <- suppressWarnings(read_csv(file, col_types = cols(.default = "c"), progress = F))
@@ -47,25 +64,32 @@ grade <- function(file, name = tools::file_path_sans_ext(basename(file)), grades
       Grade = mapply(assignGrade, Size))
   
   # save tuber list
-  tuber_path <- file.path(out_dir, paste(name, "- graded tuber list.csv"))
-  df_clean %>% write_csv(tuber_path)
-  cat("Saving graded tuber list to:", tuber_path, "\n")
+  tuber_file <- file.path(out_dir, paste(name, "- graded tuber list.csv"))
+  df_clean %>%
+    writeCsvWithHeader(
+      tuber_file,
+      header =  c(
+        paste(name, "- Graded tubers"),
+        paste("Grading criteria:", grading_criteria)))
+  cat("- Saved graded tuber list to:", tuber_file, "\n")
   
-  # get ordered plot list
+
+# Get plot names -----------------------------------------------------------
+
   message("\nGetting plots...")
-  plots <- unique(df_clean$Plot)
-  if (anyNA(plots)) {
-    stop("Missing value(s) in plot name column, check data!")
-  }
-  cat("As run:", paste(plots, collapse = ", "), "\n")
-  cat("Sorted:", paste(sort(plots), collapse = ", "), "\n")
-  cat("Total plots:", length(plots), "\n")
-  if (is.character(df_clean$Plot)) {
-    message("Non-numeric plot number detected, confirm plot names!")
-  }
   
-  # get culls
+  plots <- unique(df_clean$Plot)
+  if (anyNA(plots)) stop("Missing value(s) in plot name column, check data!")
+  
+  cat("- As run:", paste(plots, collapse = ", "), "\n")
+  cat("- Sorted:", paste(sort(plots), collapse = ", "), "\n")
+  cat("- Total plots:", length(plots), "\n")
+  
+
+# Get culls ---------------------------------------------------------------
+
   message("\nGetting cull weights...")
+  
   culls <- df %>%
     filter(Researcher == "Culls Weight") %>%
     select(Trial) %>%
@@ -74,14 +98,17 @@ grade <- function(file, name = tools::file_path_sans_ext(basename(file)), grades
   # check for culls error
   if (length(plots) != nrow(culls)) {
     culls <- tibble(Plot = plots, cull_wt = NA)
-    cat("ERROR: Failed to parse cull weights, check for extra cull weights or unnamed plots in data!\n")
+    cat("- ERROR: Failed to parse cull weights, check for extra cull weights or unnamed plots in data!\n")
     warning("Failed to parse cull weights, check for extra cull weights or unnamed plots in data!")
   } else {
     culls <- cbind(tibble(Plot = plots), culls)
     culls_file <- file.path(out_dir, paste(name, "- cull weights.csv"))
-    cat("Saving cull weights to:", culls_file, "\n")
+    cat("- Saved cull weights to:", culls_file, "\n")
     write_csv(culls, culls_file)
   }
+  
+
+# Summarize dataset -------------------------------------------------------
   
   # total summary
   message("\nSummarizing dataset...")
@@ -108,23 +135,36 @@ grade <- function(file, name = tools::file_path_sans_ext(basename(file)), grades
       prp_hollow = sum(Hollow),
       prp_double = sum(Double),
       prp_knob = sum(Knob),
-      .groups = "drop") %>%
+      .groups = "drop_last") %>%
+    mutate(prp_tubers = n_tubers / sum(n_tubers), .after = "n_tubers") %>%
+    mutate(prp_total_wt = total_wt / sum(total_wt), .after = "total_wt") %>%
+    ungroup() %>%
     mutate(prp_defect = prp_hollow + prp_double + prp_knob) %>%
     mutate(across(c(prp_hollow, prp_double, prp_knob, prp_defect), ~ .x / n_tubers))
+  
+  # save to file
+  summary_file <- file.path(out_dir, paste(name, "- grading summary (long format).csv"))
+  grade_summary %>%
+    writeCsvWithHeader(
+      summary_file,
+      header = c(
+        paste(name, "- Grading summary (long format)"),
+        paste("Grading criteria:", grading_criteria)))
+  cat("- Saved grading summary (long format) to:", summary_file, "\n")
 
+  # wide format
   grade_summary_wide <- grade_summary %>%
     pivot_wider(
       names_from = "Grade",
-      values_from = c("n_tubers", "total_wt", "mean_wt", "prp_hollow", "prp_double", "prp_knob", "prp_defect")
-    )
+      values_from = -c("Plot", "Grade"))
   
   # join the summaries and the culls
   summary <- totals_summary %>%
     left_join(grade_summary_wide, by = "Plot") %>%
     left_join(culls, by = "Plot")
   
+  # reorganize columns
   col_names_sorted <- sort(names(summary)[-1])
-  
   summary <- summary %>%
     select("Plot", all_of(col_names_sorted)) %>%
     select(
@@ -136,13 +176,21 @@ grade <- function(file, name = tools::file_path_sans_ext(basename(file)), grades
       starts_with("prp_"),
       everything())
   
-  summary_path <- file.path(out_dir, paste(name, "- plot summaries.csv"))
-  summary %>% write_csv(summary_path)
-  cat("Saving plot-wise grading summaries to:", summary_path, "\n")
+  # save to file
+  summary_file <- file.path(out_dir, paste(name, "- grading summary (wide format).csv"))
+  summary %>%
+    writeCsvWithHeader(
+      summary_file,
+      header = c(
+        paste(name, "- Grading summary (wide format)"),
+        paste("Grading criteria:", grading_criteria)))
+  cat("- Saved grading summary (wide format) to:", summary_file, "\n")
   
-  
-  # simple plot
+
+# Create plot ------------------------------------------------------------
+
   message("\nGenerating summary plot...")
+  
   if (is.numeric(summary$Plot)) {
     summary <- summary %>%
       arrange(Plot) %>%
@@ -160,21 +208,24 @@ grade <- function(file, name = tools::file_path_sans_ext(basename(file)), grades
       title = paste(name, "- Total plot weights"),
       subtitle = paste("Grading criteria:", grading_criteria),
       x = "Plot",
-      y = "Total weight (oz)",
+      y = "Total weight (oz)"
     ) +
     theme_classic() +
-    theme(
-      axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+  
   show(plot)
   
-  plot_path <- file.path(out_dir, paste(name, "- total weights plot.png"))
-  cat("Saving plot image to:", plot_path, "\n")
-  suppressMessages(ggsave(plot_path, plot, type = "cairo"))
+  plot_file <- file.path(out_dir, paste(name, "- total weights plot.png"))
+  cat("- Saved plot image to:", plot_file, "\n")
+  suppressMessages(ggsave(plot_file, plot, type = "cairo"))
   
+
+# Finish up ---------------------------------------------------------------
+
   assign("all_tubers", df_clean, envir = .GlobalEnv)
   assign("grade_summary", grade_summary, envir = .GlobalEnv)
   assign("totals_summary", summary, envir = .GlobalEnv)
   assign("plot", plot, envir = .GlobalEnv)
   
-  message("\nAlso data and plots to: all_tubers, grade_summary, totals_summary, plot.")
+  message("\nAlso saved data and plots to: all_tubers, grade_summary, totals_summary, plot")
 }

@@ -12,9 +12,11 @@ For processing output from the AgRay potato grading machine at Hancock, WI
 
     -   `file` is the AgRay csv output file location (in quotes). This is required.
     -   `name` is either taken from the filename, or can be supplied.
-    -   `grades` is a named list of grades and sizes, or left blank to use the default. Last grade should be 0.
+    -   `grades` is a named list of grades and sizes, or left blank to use the default. Last grade should be 0. Units must be inches.
 
 4.  The script will output a graded tuber list, the culls list, and a per-plot summary of counts, weights, and quality by tuber grade. Outputs will be written to the same directory as the csv, under a sub-directory with the same name as the input csv, or the user-supplied name.
+
+5. Weights are given in ounces and sizes in inches.
 
 ## Example usage
 
