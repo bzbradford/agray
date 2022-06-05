@@ -7,7 +7,7 @@
 library(tidyverse)
 
 grade <- function(file, name = tools::file_path_sans_ext(basename(file)), grades = list("A" = 1.875, "B" = 1.5, "C" = 0)) {
-  require(tidyverse)
+  if (!require(tidyverse)) install.packages("tidyverse")
   
   # Checks
   if (!file.exists(file)) stop("File '", file, "' not found.")
