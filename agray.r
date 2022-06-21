@@ -1,19 +1,23 @@
-# For cleaning and summarizing AgRay grader data
-# Ben Bradford, bbradford@wisc.edu
-#
-# If it doesn't run, check for missing plot numbers or too many cull weights
-# Grades can be provided as a named list in descending order of size
+#' For cleaning and summarizing AgRay grader data
+#' Ben Bradford, bbradford@wisc.edu
+#'
+#' If it doesn't run, check for missing plot numbers or too many cull weights
+#' 
+#' Grades can be provided as a named list in descending order of size, in inches or ounces
+#' Provide `grading_metric = "Weight"` to switch to weight-based grading
 
 library(tidyverse)
 
 grade <- function(
   file,
   name = tools::file_path_sans_ext(basename(file)),
-  grades = list("A" = 1.875, "B" = 1.5, "C" = 0)) {
-  
-  if (!require(tidyverse)) install.packages("tidyverse")
+  grades = list("A" = 1.875, "B" = 1.5, "C" = 0),
+  grading_type = "Size"
+) {
   
 # Argument checks ---------------------------------------------------------
+  
+  if (!require(tidyverse)) install.packages("tidyverse")
   
   if (!file.exists(file)) stop("File '", file, "' not found.")
   message("Input file: ", file)
@@ -25,9 +29,14 @@ grade <- function(
   message("Saving outputs to: ", out_dir)
   
   if (!is.list(grades) | is.null(names(grades))) stop("Tuber grades must be a named list.")
-  grading_criteria <- paste0(paste(names(grades), grades, sep = " >= ", collapse = '", '), '" diameter')
-  message("Grades: ", grading_criteria)
+  if (!(grading_type %in% c("Size", "Weight"))) stop("Grading type must be one of 'Size', 'Weight'")
   
+  if (grading_type == "Size") {
+    grading_criteria <- paste0(paste(names(grades), grades, sep = " > ", collapse = "\", "), "\" diameter")
+  } else {
+    grading_criteria <- paste0(paste(names(grades), grades, sep = " > ", collapse = " oz, "), " oz weight")
+  }
+  message("Grades: ", grading_criteria)
   
 
 # Define functions --------------------------------------------------------
@@ -61,7 +70,7 @@ grade <- function(
     type_convert(col_types = cols()) %>%
     mutate(
       Size = pmap_dbl(list(Width, Length, Height), ~ sort(c(..1, ..2, ..3))[2]),
-      Grade = mapply(assignGrade, Size))
+      Grade = factor(mapply(assignGrade, .data[[grading_type]]), levels = c(names(grades), "No grade")))
   
   # save tuber list
   tuber_file <- file.path(out_dir, paste(name, "- graded tuber list.csv"))
@@ -199,6 +208,7 @@ grade <- function(
   
   plot <- grade_summary %>%
     group_by(Plot) %>%
+    mutate(Plot = fct_inorder(as.character(Plot))) %>%
     mutate(pct_wt = total_wt / sum(total_wt)) %>%
     ggplot(aes(x = Plot, y = total_wt, fill = Grade, label = scales::percent(pct_wt, 1))) +
     geom_col(color = "black", size = 0.25, position = "stack") +
