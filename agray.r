@@ -6,8 +6,6 @@
 #' Grades can be provided as a named list in descending order of size, in inches or ounces
 #' Provide `grading_metric = "Weight"` to switch to weight-based grading
 
-library(tidyverse)
-
 grade <- function(
   file,
   name = tools::file_path_sans_ext(basename(file)),
@@ -18,6 +16,7 @@ grade <- function(
 # Argument checks ---------------------------------------------------------
   
   if (!require(tidyverse)) install.packages("tidyverse")
+  if (!require(janitor)) install.packages("janitor")
   
   if (!file.exists(file)) stop("File '", file, "' not found.")
   message("Input file: ", file)
@@ -106,6 +105,8 @@ grade <- function(
   
   # check for culls error
   if (length(plots) != nrow(culls)) {
+    message("ERROR: Plots/culls mismatch (", length(plots), " plots, ", nrow(culls), " culls)")
+    print(plots)
     culls <- tibble(Plot = plots, cull_wt = NA)
     cat("- ERROR: Failed to parse cull weights, check for extra cull weights or unnamed plots in data!\n")
     warning("Failed to parse cull weights, check for extra cull weights or unnamed plots in data!")
@@ -154,6 +155,7 @@ grade <- function(
   # save to file
   summary_file <- file.path(out_dir, paste(name, "- grading summary (long format).csv"))
   grade_summary %>%
+    janitor::clean_names(case = "big_camel") %>%
     writeCsvWithHeader(
       summary_file,
       header = c(
@@ -188,6 +190,7 @@ grade <- function(
   # save to file
   summary_file <- file.path(out_dir, paste(name, "- grading summary (wide format).csv"))
   summary %>%
+    janitor::clean_names(case = "big_camel") %>%
     writeCsvWithHeader(
       summary_file,
       header = c(
@@ -227,7 +230,7 @@ grade <- function(
   
   plot_file <- file.path(out_dir, paste(name, "- total weights plot.png"))
   cat("- Saved plot image to:", plot_file, "\n")
-  suppressMessages(ggsave(plot_file, plot, type = "cairo"))
+  suppressMessages(ggsave(plot_file, plot))
   
 
 # Finish up ---------------------------------------------------------------
