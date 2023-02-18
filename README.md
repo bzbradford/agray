@@ -20,37 +20,39 @@ For processing output from the AgRay potato grading machine at Hancock, WI
 
 ## Example usage
 
-    # my_analysis_script.R
+```R
+# my_analysis_script.R
 
-    source("agray.r")
-
-
-    ### Using default name and grading scheme ###
-    # This will output to a folder called 'my_agray_file' within the current project directory
-
-    grade(file = "my_agray_file.csv")
+source("agray.r")
 
 
-    ### Supplying your own trial name ###
-    # This will output to a folder called 'CPB Trial' within the current project directory
+### Using default name and grading scheme ###
+# This will output to a folder called 'my_agray_file' within the current project directory
 
-    grade(
-      file = "my_agray_file.csv",
-      name = "CPB Trial"
-    )
+grade(file = "my_agray_file.csv")
 
 
-    ### Supplying your own tuber grades ###
+### Supplying your own trial name ###
+# This will output to a folder called 'CPB Trial' within the current project directory
 
-    my_grades <- list(
-      "Large" = 3,
-      "Med" = 2,
-      "Small" = 1,
-      "Undersize" = 0
-    )
+grade(
+  file = "my_agray_file.csv",
+  name = "CPB Trial"
+)
 
-    grade(
-      file = "my_agray_file.csv",
-      name = "Alternate tuber grades trial",
-      grades = my_grades
-    )
+
+### Supplying your own tuber grades ###
+
+my_grades <- list(
+  "Large" = 3,
+  "Med" = 2,
+  "Small" = 1,
+  "Undersize" = 0
+)
+
+grade(
+  file = "my_agray_file.csv",
+  name = "Alternate tuber grades trial",
+  grades = my_grades
+)
+```
