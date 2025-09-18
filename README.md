@@ -1,4 +1,4 @@
-# AgRay data wrangling
+# AgRay yield data analysis
 
 For processing output from the AgRay potato grading machine at Hancock, WI
 
@@ -6,51 +6,272 @@ For processing output from the AgRay potato grading machine at Hancock, WI
 
 1.  Install R, Rstudio, tidyverse package
 
-2.  Run the `grade` function definition or source the file with `source("agray.r")` from your analysis script.
+2.  Source the grading function definition file with `source("agray.r")` from your analysis script. This must be done if `grade()` is not defined in the Environment yet.
 
-3.  Call the `grade(file, name, grades)` with your data.
+3.  Call the `grade(file, name, grades, grade_by, area)` with your data.
 
-    -   `file` is the AgRay csv output file location (in quotes). This is required.
-    -   `name` is either taken from the filename, or can be supplied.
-    -   `grades` is a named list of grades and sizes, or left blank to use the default. Last grade should be 0. Units must be inches.
+    -   `file`, required, is the AgRay csv output file location (in quotes). This is required.
+    -   `name`, optional, is either taken from the filename, or can be supplied. Results will be written to a folder by this name, created in the same directory as the input `file`.
+    -   `grades`, optional, is a named list of grades and sizes, or left blank to use the default. Last grade should be 0. Units must be inches if `grade_by = "Size"` or ounces if `grade_by = "Weight"` to match the units of those columns in the AgRay data. If not supplied it grades by size into A's, B's, and C's.
+    -   `grade_by`, optional, must be either `"Size"` (default) or `"Weight"`, indicating whether tubers should be graded by size or by weight.
+    -   `area`, optional, will turn plot weights into yields on a hundredweight (cwt = 100 lbs) per acre basis. Should be provided in units of square feet. For example a one-row 20 ft. plot would be 60 sq. ft. if row spacing is 3 ft.
 
 4.  The script will output a graded tuber list, the culls list, and a per-plot summary of counts, weights, and quality by tuber grade. Outputs will be written to the same directory as the csv, under a sub-directory with the same name as the input csv, or the user-supplied name.
 
-5. Weights are given in ounces and sizes in inches.
+5.  Weights are given in ounces and sizes in inches.
+
+6.  The function may throw an error if there are duplicate plot numbers or extra cull weights. In this case you will have to open the csv file from the grader and look for any such problems and correct them before trying to process the data.
 
 ## Example usage
 
-    # my_analysis_script.R
+Render `example_grading.Rmd` to `md` with `rmarkdown::render("example_grading.Rmd", output_format = "github_document")`
 
-    source("agray.r")
+# Example Usage of agray Package
 
+This document demonstrates how to use the agray grading functions for grading potato tubers.
 
-    ### Using default name and grading scheme ###
-    # This will output to a folder called 'my_agray_file' within the current project directory
+## Using default name and grading scheme
 
-    grade(file = "my_agray_file.csv")
+``` r
+grade(file = "example_data.csv")
+```
 
+```         
+## 
+## Cleaning input file...
+## - Saved graded tuber list to: ./example_data/example_data - Graded tuber list.csv 
+## 
+## Getting plots...
+## - As run: 402, 401, 305, 304, 203, 201, 102, 105, 101, 104, 202, 206, 306, 506, 303, 404, 406, 405, 403, 301, 302, 205, 204, 106, 103 
+## - Sorted: 101, 102, 103, 104, 105, 106, 201, 202, 203, 204, 205, 206, 301, 302, 303, 304, 305, 306, 401, 402, 403, 404, 405, 406, 506 
+## - Total plots: 25 
+## 
+## Getting cull weights...
+## - Saved cull weights to: ./example_data/example_data - Cull weights.csv 
+## 
+## Summarizing dataset...
+## - Total tubers: 7182 
+## - Total weight: 1337 lbs.
+## - Mean weight: 3 oz.
+## - Proportion A: 63.1% 
+## - Proportion B: 27.1% 
+## - Proportion C: 9.8% 
+## - Saved grading summary (long format) to: ./example_data/example_data - Grading summary (long format).csv 
+## - Saved grading summary (wide format) to: ./example_data/example_data - Grading summary (wide format).csv 
+## 
+## Generating summary plot...
 
-    ### Supplying your own trial name ###
-    # This will output to a folder called 'CPB Trial' within the current project directory
+## - Saved plot image to: ./example_data/example_data - Yield summary.png
+```
 
-    grade(
-      file = "my_agray_file.csv",
-      name = "CPB Trial"
-    )
+![](example_grading_files/figure-gfm/default-grading-1.png)<!-- -->
 
+```         
+## 
+## Also saved to local environment: all_tubers, grade_summary, totals_summary, plt
+```
 
-    ### Supplying your own tuber grades ###
+This will output to a folder called ‘example_data’ within the current project directory.
 
-    my_grades <- list(
-      "Large" = 3,
-      "Med" = 2,
-      "Small" = 1,
-      "Undersize" = 0
-    )
+## Supplying your own trial name
 
-    grade(
-      file = "my_agray_file.csv",
-      name = "Alternate tuber grades trial",
-      grades = my_grades
-    )
+``` r
+grade(
+  file = "example_data.csv",
+  name = "Example trial"
+)
+```
+
+```         
+## 
+## Cleaning input file...
+## - Saved graded tuber list to: ./Example trial/Example trial - Graded tuber list.csv 
+## 
+## Getting plots...
+## - As run: 402, 401, 305, 304, 203, 201, 102, 105, 101, 104, 202, 206, 306, 506, 303, 404, 406, 405, 403, 301, 302, 205, 204, 106, 103 
+## - Sorted: 101, 102, 103, 104, 105, 106, 201, 202, 203, 204, 205, 206, 301, 302, 303, 304, 305, 306, 401, 402, 403, 404, 405, 406, 506 
+## - Total plots: 25 
+## 
+## Getting cull weights...
+## - Saved cull weights to: ./Example trial/Example trial - Cull weights.csv 
+## 
+## Summarizing dataset...
+## - Total tubers: 7182 
+## - Total weight: 1337 lbs.
+## - Mean weight: 3 oz.
+## - Proportion A: 63.1% 
+## - Proportion B: 27.1% 
+## - Proportion C: 9.8% 
+## - Saved grading summary (long format) to: ./Example trial/Example trial - Grading summary (long format).csv 
+## - Saved grading summary (wide format) to: ./Example trial/Example trial - Grading summary (wide format).csv 
+## 
+## Generating summary plot...
+
+## - Saved plot image to: ./Example trial/Example trial - Yield summary.png
+```
+
+![](example_grading_files/figure-gfm/custom-name-1.png)<!-- -->
+
+```         
+## 
+## Also saved to local environment: all_tubers, grade_summary, totals_summary, plt
+```
+
+This will output to a folder called ‘Example trial’ within the current project directory.
+
+## Supplying the harvested area
+
+``` r
+grade(
+  file = "example_data.csv",
+  name = "Example trial with yield",
+  area = 60
+)
+```
+
+```         
+## 
+## Cleaning input file...
+## - Saved graded tuber list to: ./Example trial with yield/Example trial with yield - Graded tuber list.csv 
+## 
+## Getting plots...
+## - As run: 402, 401, 305, 304, 203, 201, 102, 105, 101, 104, 202, 206, 306, 506, 303, 404, 406, 405, 403, 301, 302, 205, 204, 106, 103 
+## - Sorted: 101, 102, 103, 104, 105, 106, 201, 202, 203, 204, 205, 206, 301, 302, 303, 304, 305, 306, 401, 402, 403, 404, 405, 406, 506 
+## - Total plots: 25 
+## 
+## Getting cull weights...
+## - Saved cull weights to: ./Example trial with yield/Example trial with yield - Cull weights.csv 
+## 
+## Summarizing dataset...
+## - Total tubers: 7182 
+## - Total weight: 1337 lbs.
+## - Mean weight: 3 oz.
+## - Proportion A: 63.1% 
+## - Proportion B: 27.1% 
+## - Proportion C: 9.8% 
+## - Saved grading summary (long format) to: ./Example trial with yield/Example trial with yield - Grading summary (long format).csv 
+## - Saved grading summary (wide format) to: ./Example trial with yield/Example trial with yield - Grading summary (wide format).csv 
+## 
+## Generating summary plot...
+
+## - Saved plot image to: ./Example trial with yield/Example trial with yield - Yield summary.png
+```
+
+![](example_grading_files/figure-gfm/with-area-1.png)<!-- -->
+
+```         
+## 
+## Also saved to local environment: all_tubers, grade_summary, totals_summary, plt
+```
+
+Now the output files will include additional columns for calculated yields.
+
+## Custom tuber grades by size
+
+``` r
+# Remember the values are the minimum size for each class
+size_grades <- list(
+  "Large" = 3,
+  "Med" = 2,
+  "Small" = 1,
+  "Undersize" = 0
+)
+
+grade(
+  file = "example_data.csv",
+  name = "Example trial - custom size grades",
+  grades = size_grades,
+  area = 60
+)
+```
+
+```         
+## 
+## Cleaning input file...
+## - Saved graded tuber list to: ./Example trial - custom size grades/Example trial - custom size grades - Graded tuber list.csv 
+## 
+## Getting plots...
+## - As run: 402, 401, 305, 304, 203, 201, 102, 105, 101, 104, 202, 206, 306, 506, 303, 404, 406, 405, 403, 301, 302, 205, 204, 106, 103 
+## - Sorted: 101, 102, 103, 104, 105, 106, 201, 202, 203, 204, 205, 206, 301, 302, 303, 304, 305, 306, 401, 402, 403, 404, 405, 406, 506 
+## - Total plots: 25 
+## 
+## Getting cull weights...
+## - Saved cull weights to: ./Example trial - custom size grades/Example trial - custom size grades - Cull weights.csv 
+## 
+## Summarizing dataset...
+## - Total tubers: 7182 
+## - Total weight: 1337 lbs.
+## - Mean weight: 3 oz.
+## - Proportion Large: 1.3% 
+## - Proportion Med: 48.2% 
+## - Proportion Small: 50.2% 
+## - Proportion Undersize: 0.3% 
+## - Saved grading summary (long format) to: ./Example trial - custom size grades/Example trial - custom size grades - Grading summary (long format).csv 
+## - Saved grading summary (wide format) to: ./Example trial - custom size grades/Example trial - custom size grades - Grading summary (wide format).csv 
+## 
+## Generating summary plot...
+
+## - Saved plot image to: ./Example trial - custom size grades/Example trial - custom size grades - Yield summary.png
+```
+
+![](example_grading_files/figure-gfm/custom-size-grades-1.png)<!-- -->
+
+```         
+## 
+## Also saved to local environment: all_tubers, grade_summary, totals_summary, plt
+```
+
+## Custom tuber grades by weight
+
+``` r
+weight_grades <- list(
+  "8+ oz" = 8,
+  "4-8 oz" = 4,
+  "2-4 oz" = 2,
+  "<2 oz" = 0
+)
+
+grade(
+  file = "example_data.csv",
+  name = "Example trial - custom weight grades",
+  grades = weight_grades,
+  grade_by = "Weight",
+  area = 60
+)
+```
+
+```         
+## 
+## Cleaning input file...
+## - Saved graded tuber list to: ./Example trial - custom weight grades/Example trial - custom weight grades - Graded tuber list.csv 
+## 
+## Getting plots...
+## - As run: 402, 401, 305, 304, 203, 201, 102, 105, 101, 104, 202, 206, 306, 506, 303, 404, 406, 405, 403, 301, 302, 205, 204, 106, 103 
+## - Sorted: 101, 102, 103, 104, 105, 106, 201, 202, 203, 204, 205, 206, 301, 302, 303, 304, 305, 306, 401, 402, 403, 404, 405, 406, 506 
+## - Total plots: 25 
+## 
+## Getting cull weights...
+## - Saved cull weights to: ./Example trial - custom weight grades/Example trial - custom weight grades - Cull weights.csv 
+## 
+## Summarizing dataset...
+## - Total tubers: 7182 
+## - Total weight: 1337 lbs.
+## - Mean weight: 3 oz.
+## - Proportion 8+ oz: 1.6% 
+## - Proportion 4-8 oz: 20.4% 
+## - Proportion 2-4 oz: 46.0% 
+## - Proportion <2 oz: 32.0% 
+## - Saved grading summary (long format) to: ./Example trial - custom weight grades/Example trial - custom weight grades - Grading summary (long format).csv 
+## - Saved grading summary (wide format) to: ./Example trial - custom weight grades/Example trial - custom weight grades - Grading summary (wide format).csv 
+## 
+## Generating summary plot...
+
+## - Saved plot image to: ./Example trial - custom weight grades/Example trial - custom weight grades - Yield summary.png
+```
+
+![](example_grading_files/figure-gfm/custom-weight-grades-1.png)<!-- -->
+
+```         
+## 
+## Also saved to local environment: all_tubers, grade_summary, totals_summary, plt
+```

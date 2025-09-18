@@ -1,0 +1,71 @@
+# Example Usage of agray Package
+
+This document demonstrates how to use the agray grading functions for grading potato tubers.
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+source("agray.r")
+```
+
+## Using default name and grading scheme
+```{r default-grading}
+grade(file = "example_data.csv")
+```
+
+This will output to a folder called 'example_data' within the current project directory.
+
+## Supplying your own trial name
+```{r custom-name}
+grade(
+  file = "example_data.csv",
+  name = "Example trial"
+)
+```
+
+This will output to a folder called 'Example trial' within the current project directory.
+
+## Supplying the harvested area
+```{r with-area}
+grade(
+  file = "example_data.csv",
+  name = "Example trial with yield",
+  area = 60
+)
+```
+
+Now the output files will include additional columns for calculated yields.
+
+## Custom tuber grades by size
+```{r custom-size-grades}
+# Remember the values are the minimum size for each class
+size_grades <- list(
+  "Large" = 3,
+  "Med" = 2,
+  "Small" = 1,
+  "Undersize" = 0
+)
+
+grade(
+  file = "example_data.csv",
+  name = "Example trial - custom size grades",
+  grades = size_grades,
+  area = 60
+)
+```
+
+## Custom tuber grades by weight
+```{r custom-weight-grades}
+weight_grades <- list(
+  "8+ oz" = 8,
+  "4-8 oz" = 4,
+  "2-4 oz" = 2,
+  "<2 oz" = 0
+)
+
+grade(
+  file = "example_data.csv",
+  name = "Example trial - custom weight grades",
+  grades = weight_grades,
+  grade_by = "Weight",
+  area = 60
+)
+```
